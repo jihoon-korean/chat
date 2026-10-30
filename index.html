@@ -38,6 +38,10 @@ button,[role="button"]{-webkit-user-select:none;user-select:none}
 .auth-remember span{line-height:1.5}
 
 .mb-real-title{display:flex;justify-content:space-between;align-items:center;margin:13px 0 9px;padding:0 4px;color:#39363e;font-size:13px}.mb-real-title button{background:transparent;color:var(--pink);font-weight:700}.mb-real-title span,.mb-member-empty{font-size:12px;color:#888}.mb-member-empty{padding:12px 6px 20px}.mb-member-card .cardbody{cursor:pointer}
+
+/* Chat input: neutral focus, no browser blue ring. */
+#mbRealText:focus,#mbRealText:focus-visible{outline:none!important;box-shadow:none!important;border-color:#d9d9dd!important;-webkit-tap-highlight-color:transparent}
+.composer button{-webkit-tap-highlight-color:transparent}
 </style><script>
 /* Prevent pinch/double-tap page zoom on mobile; preserve one-finger scrolling. */
 (function () {
@@ -102,8 +106,30 @@ function mbPeer(id){return mbMembers.find(p=>p.id===id)}
 function mbRealRoomsHtml(){return mbRealRooms.map(r=>{const peerId=r.user_a===authUser?.id?r.user_b:r.user_a;const p=mbPeer(peerId);return `<div class="card mb-member-card"><div class="avatar" onclick="mbOpenRealChat('${peerId}')"><img src="${esc(p?.profile_photo_url||defaultAvatar(p?.gender||'남'))}"></div><div class="cardbody" onclick="mbOpenRealChat('${peerId}')"><div class="ident">${esc(p?.nickname||'회원')}</div><div class="headline">${esc(r.last_text||'대화를 시작해 보세요')}</div><div class="meta">실제 회원 · 서버 동기화</div></div><button class="chatbtn" onclick="mbOpenRealChat('${peerId}')">열기</button></div>`}).join('')}
 async function mbLoadRealRooms(){if(!authUser||!authReady())return;const uid=authUser.id;try{const {data,error}=await sbClient.from('member_chat_rooms').select('id,user_a,user_b,created_at').or(`user_a.eq.${uid},user_b.eq.${uid}`).order('created_at',{ascending:false});if(error)throw error;if(authUser?.id!==uid)return;mbRealRooms=data||[];if(page!=='realchat')render()}catch(e){console.error('채팅방 목록 오류',e);notify('채팅방 목록 조회 실패: '+e.message)}}
 async function mbOpenRealChat(peerId){if(!authUser)return notify('로그인이 필요합니다.');if(peerId===authUser.id)return notify('본인에게는 채팅할 수 없습니다.');if(!mbPeer(peerId))return notify('상대 회원을 찾지 못했습니다.');if(mbMemberRelations['user:'+peerId]==='block')return notify('차단한 회원에게는 채팅할 수 없습니다.');if(mbChatLoading)return;mbChatLoading=true;const uid=authUser.id;try{const a=[uid,peerId].sort();let {data,error}=await sbClient.from('member_chat_rooms').select('id,user_a,user_b').eq('user_a',a[0]).eq('user_b',a[1]).maybeSingle();if(error)throw error;if(!data){const res=await sbClient.from('member_chat_rooms').insert({user_a:a[0],user_b:a[1],created_by:uid}).select('id,user_a,user_b').single();if(res.error){if(res.error.code==='23505'){const retry=await sbClient.from('member_chat_rooms').select('id,user_a,user_b').eq('user_a',a[0]).eq('user_b',a[1]).single();if(retry.error)throw retry.error;data=retry.data}else throw res.error}else data=res.data;}if(authUser?.id!==uid)return;mbRealRoomId=data.id;mbRealPeerId=peerId;mbRealMessages=[];modal=null;page='realchat';menu=false;mbStopChatPolling();render();await mbLoadRealMessages();mbChatPoll=setInterval(()=>{if(page==='realchat'&&authUser?.id===uid)mbLoadRealMessages(true);else mbStopChatPolling()},5000);mbLoadRealRooms()}catch(e){notify('채팅방 열기 실패: '+e.message)}finally{mbChatLoading=false}}
-async function mbLoadRealMessages(silent=false){if(!mbRealRoomId||!authUser)return;const room=mbRealRoomId,uid=authUser.id;try{const {data,error}=await sbClient.from('member_chat_messages').select('id,sender_id,body,created_at').eq('room_id',room).order('created_at',{ascending:true}).limit(300);if(error)throw error;if(room!==mbRealRoomId||uid!==authUser?.id)return;const old=mbRealMessages.map(x=>x.id).join(',');mbRealMessages=data||[];if(page==='realchat'&&old!==mbRealMessages.map(x=>x.id).join(',')){const el=document.getElementById('messages'),atBottom=!el||el.scrollHeight-el.scrollTop-el.clientHeight<90;const draft=document.getElementById('mbRealText');const draftValue=draft?.value||'';const wasFocused=document.activeElement===draft;const cursorPos=draft?.selectionStart;render();const newDraft=document.getElementById('mbRealText');if(newDraft){newDraft.value=draftValue;if(wasFocused){newDraft.focus({preventScroll:true});try{newDraft.setSelectionRange(cursorPos,cursorPos)}catch(_){}}}if(atBottom)scrollChat()}}catch(e){if(!silent)notify('메시지를 불러오지 못했습니다: '+e.message)}}
-function mbRealChatPage(){const p=mbPeer(mbRealPeerId),blocked=mbMemberRelations['user:'+mbRealPeerId]==='block';return `${sub(esc(p?.nickname||'회원'),'back()',`<button class="profile-quick" onclick="mbOpenMember('${mbRealPeerId}')">프로필</button>`)}<div class="chatbody"><div class="messages" id="messages"><div class="datepill">실제 회원 간 대화 · 서버 저장</div>${mbRealMessages.map(m=>{const mine=m.sender_id===authUser?.id;const t=new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false});return `<div class="bubbleline ${mine?'mine':''}">${mine?`<span class="time">${t}</span>`:''}<div class="bubble">${esc(m.body)}</div>${!mine?`<span class="time">${t}</span>`:''}</div>`}).join('')}</div><form class="composer" onsubmit="mbSendRealMessage(event)"><input id="mbRealText" maxlength="2000" autocomplete="off" placeholder="${blocked?'차단한 회원입니다':'메시지를 입력하세요'}" ${blocked?'disabled':''}><button type="submit" ${blocked||mbChatSending?'disabled':''}>전송</button></form></div>`}
+async function mbLoadRealMessages(silent=false){
+ if(!mbRealRoomId||!authUser)return;
+ const room=mbRealRoomId,uid=authUser.id;
+ try{
+  const {data,error}=await sbClient.from('member_chat_messages').select('id,sender_id,body,created_at').eq('room_id',room).order('created_at',{ascending:true}).limit(300);
+  if(error)throw error;
+  if(room!==mbRealRoomId||uid!==authUser?.id)return;
+  const old=mbRealMessages.map(x=>x.id).join(',');
+  mbRealMessages=data||[];
+  if(page==='realchat'&&old!==mbRealMessages.map(x=>x.id).join(',')){
+   // Update only the message list. Recreating the composer dismisses iOS keyboard and caret.
+   const current=document.getElementById('messages');
+   if(current){
+    const atBottom=current.scrollHeight-current.scrollTop-current.clientHeight<90;
+    const holder=document.createElement('div');
+    holder.innerHTML=mbRealChatPage();
+    const fresh=holder.querySelector('#messages');
+    if(fresh)current.innerHTML=fresh.innerHTML;
+    if(atBottom)scrollChat();
+   }
+  }
+ }catch(e){if(!silent)notify('메시지를 불러오지 못했습니다: '+e.message)}
+}
+function mbRealChatPage(){const p=mbPeer(mbRealPeerId),blocked=mbMemberRelations['user:'+mbRealPeerId]==='block';return `${sub(esc(p?.nickname||'회원'),'back()',`<button class="profile-quick" onclick="mbOpenMember('${mbRealPeerId}')">프로필</button>`)}<div class="chatbody"><div class="messages" id="messages"><div class="datepill">실제 회원 간 대화 · 서버 저장</div>${mbRealMessages.map(m=>{const mine=m.sender_id===authUser?.id;const t=new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false});return `<div class="bubbleline ${mine?'mine':''}">${mine?`<span class="time">${t}</span>`:''}<div class="bubble">${esc(m.body)}</div>${!mine?`<span class="time">${t}</span>`:''}</div>`}).join('')}</div><form class="composer" autocomplete="off" onsubmit="mbSendRealMessage(event)"><input id="mbRealText" name="mb_message_draft" type="text" maxlength="2000" autocomplete="off" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="send" placeholder="${blocked?'차단한 회원입니다':'메시지를 입력하세요'}" ${blocked?'disabled':''}><button type="submit" onpointerdown="if(event.pointerType!=='mouse')event.preventDefault()" ${blocked||mbChatSending?'disabled':''}>전송</button></form></div>`}
 async function mbSendRealMessage(e){
  e.preventDefault();
  if(mbChatSending||!authUser||!mbRealRoomId)return;
@@ -126,7 +152,7 @@ async function mbSendRealMessage(e){
   const current=document.getElementById('mbRealText');
   const button=current?.closest('form')?.querySelector('button[type=submit]');
   if(button)button.disabled=false;
-  if(page==='realchat'&&mbRealRoomId===room&&mbRealPeerId===peer&&authUser?.id===uid&&current&&window.matchMedia('(pointer:fine)').matches){current.focus({preventScroll:true})}
+  if(page==='realchat'&&mbRealRoomId===room&&mbRealPeerId===peer&&authUser?.id===uid&&current){try{current.focus({preventScroll:true})}catch(_){current.focus()}}
  }
 }
 
