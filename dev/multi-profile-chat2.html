@@ -53,7 +53,15 @@ $('rejoin').onclick=()=>rejoin().catch(e=>note(humanError(e),true));
 $('confirmYes').onclick=()=>{if(!pending||busy)return;const p=pending;if(p.kind==='send')send(true);else rejoin(true)};
 $('confirmNo').onclick=()=>{if(busy)return;pending=null;show('confirmBox',false);note('결제를 취소했습니다.')};
 async function init(){show('login',false);show('workspace',true);$('who').textContent=user.email||user.id;await api.call('mb61_ensure_wallet',{});await Promise.all([loadPersonas(),loadWallet(),loadRooms()]);note('chat2 개발 서버에 연결됐습니다. 테스트 포인트는 관리자가 지급해야 합니다.')}
-window.__mb61HandlersReady=true;note('진단 4: 로그인·가입 준비 완료.');
+// Development-only message polling: keep the selected room updated without a manual reload.
+let messagePollBusy=false;
+setInterval(async()=>{
+ if(messagePollBusy||!user||!room||busy||document.hidden)return;
+ messagePollBusy=true;
+ try{await loadMessages()}catch(e){/* transient polling errors must not block manual actions */}
+ finally{messagePollBusy=false}
+},5000);
+window.__mb61HandlersReady=true;note('채팅 연결 준비 완료 · 새 메시지 자동 확인 5초 간격');
 client.auth.getUser().then(({data,error})=>{if(!error&&data.user){user=data.user;init().catch(e=>note(humanError(e),true))}}).catch(e=>note(humanError(e),true));
 } catch(e) { const n=document.getElementById('notice'); n.textContent='진단 5: 초기화 오류 · '+String(e?.name||'Error')+' · '+String(e?.message||e);n.className='muted error'; }
 </script></body></html>
