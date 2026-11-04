@@ -16,6 +16,8 @@ window.addEventListener('error',function(e){const n=document.getElementById('not
 window.addEventListener('unhandledrejection',function(e){const n=document.getElementById('notice');if(n){n.textContent='개발 화면 요청 오류: '+String(e.reason?.message||e.reason||'알 수 없는 오류');n.className='muted error';}});
 </script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" onerror="document.getElementById('notice').textContent='Supabase 라이브러리를 불러오지 못했습니다. 네트워크 또는 브라우저 차단 설정을 확인해 주세요.'"></script><script src="./mb61-chat2-adapter.js" onerror="document.getElementById('notice').textContent='채팅 어댑터 파일을 불러오지 못했습니다.'"></script><script>
 'use strict';
+document.getElementById('notice').textContent='진단 5: 회원가입 스크립트 시작됨';
+try {
 if(new URLSearchParams(location.search).get('embedded')==='1'){document.documentElement.classList.add('embedded-chat2')}
 const URL='https://tifofrfxbddbxcrfisxr.supabase.co',KEY='sb_publishable_TqVXn56htuyITA308UanRA_4GnNN5pV';
 if(!window.supabase||typeof window.supabase.createClient!=='function'){document.getElementById('notice').textContent='진단: Supabase 라이브러리 로딩 실패. 가입 기능을 실행할 수 없습니다.';throw new Error('Supabase SDK unavailable');}
@@ -53,4 +55,5 @@ $('confirmNo').onclick=()=>{if(busy)return;pending=null;show('confirmBox',false)
 async function init(){show('login',false);show('workspace',true);$('who').textContent=user.email||user.id;await api.call('mb61_ensure_wallet',{});await Promise.all([loadPersonas(),loadWallet(),loadRooms()]);note('chat2 개발 서버에 연결됐습니다. 테스트 포인트는 관리자가 지급해야 합니다.')}
 window.__mb61HandlersReady=true;note('진단 4: 로그인·가입 준비 완료.');
 client.auth.getUser().then(({data,error})=>{if(!error&&data.user){user=data.user;init().catch(e=>note(humanError(e),true))}}).catch(e=>note(humanError(e),true));
+} catch(e) { const n=document.getElementById('notice'); n.textContent='진단 5: 초기화 오류 · '+String(e?.name||'Error')+' · '+String(e?.message||e);n.className='muted error'; }
 </script></body></html>
