@@ -13,7 +13,10 @@ DECLARE
   mail text;
   confirmed timestamptz;
   balance_before integer;
+  already_credited integer;
 BEGIN
+  -- The PostgreSQL database name is 'postgres' on both projects; it cannot distinguish chat2.
+  -- Verify the selected Supabase project ID is tifofrfxbddbxcrfisxr BEFORE execution.
   IF current_database() IS NULL THEN RAISE EXCEPTION 'DB_UNAVAILABLE'; END IF;
   IF array_length(ids,1)<>2 OR ids[1]=ids[2] THEN RAISE EXCEPTION 'TWO_DISTINCT_USERS_REQUIRED'; END IF;
   IF '00000000-0000-0000-0000-000000000001'::uuid=ANY(ids)
@@ -27,6 +30,10 @@ BEGIN
     INSERT INTO public.mb_wallets(user_id,balance) VALUES(uid,0) ON CONFLICT(user_id) DO NOTHING;
     SELECT balance INTO balance_before FROM public.mb_wallets WHERE user_id=uid FOR UPDATE;
     IF balance_before<>0 THEN RAISE EXCEPTION 'WALLET_NOT_ZERO: %',uid; END IF;
+    IF EXISTS(SELECT 1 FROM public.mb61_send_requests WHERE owner_id=uid)
+       OR EXISTS(SELECT 1 FROM public.mb61_rejoin_requests WHERE owner_id=uid) THEN
+      RAISE EXCEPTION 'CHAT_ACTIVITY_ALREADY_EXISTS: %',uid;
+    END IF;
     IF EXISTS(SELECT 1 FROM public.mb61_point_ledger WHERE owner_id=uid) THEN
       RAISE EXCEPTION 'PREVIOUS_LEDGER_EXISTS: %',uid;
     END IF;
