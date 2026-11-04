@@ -91,14 +91,27 @@ $('diagToggle').onclick=()=>{const el=$('diagLog');el.classList.toggle('hide');$
 $('confirmYes').onclick=()=>{if(!pending||busy)return;const p=pending;if(p.kind==='send')send(p.confirmed===true||$('confirmYes').textContent==='100P 결제 승인',p.confirmed!==true&&$('confirmYes').textContent!=='100P 결제 승인');else rejoin(true)};
 $('confirmNo').onclick=()=>{if(busy)return;if(pending&&!confirm('서버에서 이미 처리됐을 수 있습니다. 복구를 포기하면 결과 확인이 어려워집니다. 정말 닫으시겠습니까?'))return;clearPending();note('결제 확인창을 닫았습니다. 처리 결과가 불확실했다면 잔액과 채팅방을 확인하세요.')};
 async function init(){show('login',false);show('workspace',true);roomPreviewCache.clear();switchChatTab('chats');$('who').textContent=user.email||user.id;await api.call('mb61_ensure_wallet',{});show('requestDiagnostics',true);await Promise.all([loadPersonas(),loadWallet(),loadRooms()]);note('chat2 개발 서버에 연결됐습니다. 테스트 포인트는 관리자가 지급해야 합니다.');restorePending()}
-// Development-only message polling: keep the selected room updated without a manual reload.
-let messagePollBusy=false;
+// Stage62: automatic updates, visible tab only. Read-only polling never retries payments.
+let messagePollBusy=false,roomListPollBusy=false;
+function chatListVisible(){const section=document.querySelector('[data-chat-section="chats"]');return !!section&&!section.hidden&&section.classList.contains('chat-list-view')}
+function chatThreadVisible(){const section=document.querySelector('[data-chat-section="chats"]');return !!section&&!section.hidden&&section.classList.contains('chat-thread-view')}
 setInterval(async()=>{
- if(messagePollBusy||!user||!room||busy||document.hidden)return;
+ if(messagePollBusy||!user||!room||busy||document.hidden||!chatThreadVisible())return;
  messagePollBusy=true;
  try{await loadMessages()}catch(e){/* transient polling errors must not block manual actions */}
  finally{messagePollBusy=false}
 },5000);
+setInterval(async()=>{
+ if(roomListPollBusy||!user||busy||document.hidden||!chatListVisible())return;
+ roomListPollBusy=true;
+ try{
+   const next=await api.listRooms(30,0)||[];
+   if(!user||!chatListVisible())return;
+   const signature=r=>r.map(x=>[x.room_id,x.last_message_id,x.unread_count,x.my_active,x.peer_active].join(':')).join('|');
+   if(signature(next)!==signature(rooms)){rooms=next;draw();fillRoomPreviews(next).catch(()=>{})}
+ }catch(e){/* network recovery is automatic on next interval; no write RPC */}
+ finally{roomListPollBusy=false}
+},8000);
 window.__mb61HandlersReady=true;note('채팅 연결 준비 완료 · 새 메시지 자동 확인 5초 간격');
 client.auth.getUser().then(({data,error})=>{if(!error&&data.user){user=data.user;init().catch(e=>note(humanError(e),true))}}).catch(e=>note(humanError(e),true));
 } catch(e) { const n=document.getElementById('notice'); n.textContent='진단 5: 초기화 오류 · '+String(e?.name||'Error')+' · '+String(e?.message||e);n.className='muted error'; }
