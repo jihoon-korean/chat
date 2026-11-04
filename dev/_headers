@@ -1,0 +1,9 @@
+/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+/multi-profile-chat2.html
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://tifofrfxbddbxcrfisxr.supabase.co wss://tifofrfxbddbxcrfisxr.supabase.co; img-src 'self' data:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'
