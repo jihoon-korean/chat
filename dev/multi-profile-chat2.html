@@ -77,7 +77,8 @@ function invalidateMessages(){messageFetchGeneration++;lastMessageRoom=null;last
 function dayKey(d){const v=new Date(d);return Number.isFinite(v.getTime())?new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(v):''}
 function dayLabel(d){return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(d))}
 function clockLabel(d){const v=new Date(d);return Number.isFinite(v.getTime())?new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'numeric',minute:'2-digit',hour12:true}).format(v):''}
-async function refreshPeerRead(roomId,generation){try{const {data,error}=await client.rpc('mb65_peer_read_cursor',{p_room:roomId});if(error)throw error;if(generation!==messageFetchGeneration||room!==roomId)return;const next=data==null?null:String(data);if(peerReadRoom!==roomId||peerReadCursor!==next){peerReadRoom=roomId;peerReadCursor=next;document.querySelectorAll('#messages [data-sent-id]').forEach(el=>{const badge=el.querySelector('.read-label');if(badge)badge.textContent=next!==null&&BigInt(el.dataset.sentId)<=BigInt(next)?'읽음':''})}}catch(e){/* Never infer read status on RPC failure */}}
+function updateReadLabels(roomId){if(room!==roomId)return;const items=Array.from(document.querySelectorAll('#messages [data-sent-id]'));let latest=null;if(peerReadRoom===roomId&&peerReadCursor!==null){for(const el of items){if(BigInt(el.dataset.sentId)<=BigInt(peerReadCursor)&&(!latest||BigInt(el.dataset.sentId)>BigInt(latest.dataset.sentId)))latest=el}}for(const el of items){const badge=el.querySelector('.read-label');if(badge)badge.textContent=el===latest?'읽음':''}}
+async function refreshPeerRead(roomId,generation){try{const {data,error}=await client.rpc('mb65_peer_read_cursor',{p_room:roomId});if(error)throw error;if(generation!==messageFetchGeneration||room!==roomId)return;const next=data==null?null:String(data);if(peerReadRoom!==roomId||peerReadCursor!==next){peerReadRoom=roomId;peerReadCursor=next;updateReadLabels(roomId)}}catch(e){/* Never infer read status on RPC failure */}}
 async function loadMessages(){
  const box=$('messages'),currentRoom=room,currentPersona=selected,owner=user?.id,generation=++messageFetchGeneration;
  if(!currentRoom)return;
@@ -100,11 +101,11 @@ async function loadMessages(){
    const own=m.sender_persona===currentPersona,line=document.createElement('div');line.className='message-line'+(own?' mine':'');
    const bubble=document.createElement('div');bubble.className='bubble'+(own?' mine':'');bubble.textContent=m.body;
    const meta=document.createElement('div');meta.className='message-meta';const time=document.createElement('span');time.textContent=clockLabel(m.created_at);
-   if(own){line.dataset.sentId=String(m.id);const read=document.createElement('span');read.className='read-label';if(peerReadRoom===currentRoom&&peerReadCursor!==null&&BigInt(m.id)<=BigInt(peerReadCursor))read.textContent='읽음';meta.append(read,time);line.append(meta,bubble)}
+   if(own){line.dataset.sentId=String(m.id);const read=document.createElement('span');read.className='read-label';meta.append(read,time);line.append(meta,bubble)}
    else{meta.append(time);line.append(bubble,meta)}
    fragment.append(line)
   }
-  box.replaceChildren(fragment);
+  box.replaceChildren(fragment);updateReadLabels(currentRoom);
   if(nearBottom||lastMessageRoom!==currentRoom)box.scrollTop=box.scrollHeight;
   else box.scrollTop=Math.max(0,previousTop+box.scrollHeight-previousHeight);
   lastMessageRoom=currentRoom;lastMessageSignature=signature;
