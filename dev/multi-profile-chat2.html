@@ -28,7 +28,7 @@ let user=null,mine=[],others=[],selected=null,peer=null,room=null,rooms=[],pendi
 const recoveryKey='mchat-chat2-stage61-recovery-v1';
 const requestDiagnostics=[];
 function traceRequest(kind,requestId,event){if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(String(requestId||'')))return;requestDiagnostics.push({kind:kind==='rejoin'?'재입장':'메시지',requestId,event:String(event).slice(0,48)});if(requestDiagnostics.length>25)requestDiagnostics.shift();renderRequestDiagnostics()}
-function renderRequestDiagnostics(){const el=$('diagLog');if(!el)return;el.textContent=requestDiagnostics.map((r,i)=>String(i+1).padStart(2,'0')+' | '+r.kind+' | '+r.event+' | '+r.requestId).join('\\n')||'진단 기록 없음'}
+function renderRequestDiagnostics(){const el=$('diagLog');if(!el)return;el.textContent=requestDiagnostics.map((r,i)=>String(i+1).padStart(2,'0')+' | '+r.kind+' | '+r.event+' | '+r.requestId).join('\n')||'진단 기록 없음'}
 
 function persistPending(){try{if(pending&&user)sessionStorage.setItem(recoveryKey,JSON.stringify({...pending,userId:user.id}));else sessionStorage.removeItem(recoveryKey)}catch(e){note('브라우저 복구 저장을 사용할 수 없습니다. 이 탭을 닫지 마세요.',true)}}
 function clearPending(){if(pending)traceRequest(pending.kind,pending.requestId,'요청 상태 정리');pending=null;persistPending();show('confirmBox',false)}
